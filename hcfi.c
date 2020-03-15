@@ -12,6 +12,8 @@ struct Entity
 	int index;
 	int group;
 	float space;
+	int *availableRooms;
+	int lenghtAvailableRooms;
 };
 
 struct Room
@@ -40,15 +42,15 @@ void checkHard(int *allocation, struct Constraints *hardConstraints, struct Room
 {
 }
 
-void checkSoft(int *allocation, struct Constraints *softConstraints, struct Room *rooms, struct Entity *entities)
+int evaluationFunction(int *allocation, struct Constraints *softConstraints, struct Room *rooms, struct Entity *entities)
 {
 }
 
-int solutionValue(int *allocation, struct Constraints *softConstraints, struct Room *rooms, struct Entity *entities)
+void checkNeighborhood(int *allocation, struct Entity *entities)
 {
 }
 
-void checkNeighborhood(int *allocation, int *visited)
+void resetAvailableRooms(struct Entity *entities)
 {
 }
 
