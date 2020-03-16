@@ -64,8 +64,9 @@ void initialEntityData(struct Room *rooms, struct Entity *entities, int nRooms, 
 
 bool violatesHard(int *allocation, struct Constraint *hardConstraints, struct Room *rooms, struct Entity *entities, int nHardConstraints, int nRooms, int nEntities)
 {
-	int i, j, entity1, entity2, room;
+	int i, j, entity1, entity2, room, room1, room2;
 	float space, totalUsed;
+	bool adjacent;
 	for (i = 0; i < nHardConstraints; i++)
 	{
 		if (hardConstraints[i].used)
@@ -140,7 +141,7 @@ bool violatesHard(int *allocation, struct Constraint *hardConstraints, struct Ro
 					{
 						if (allocation[j] == room)
 						{
-							printf("Se viola restriccion %d de tipo %d para la entidad %d en la habitación %d\n", i, hardConstraints[i].type, entity1, room);
+							printf("Se viola restriccion NOTSHARING_CONSTRAINT\n");
 							return true;
 						}
 					}
@@ -148,6 +149,30 @@ bool violatesHard(int *allocation, struct Constraint *hardConstraints, struct Ro
 			}
 
 			// Check hard restriction 7: ADJACENCY_CONSTRAINT
+			if (hardConstraints[i].type == 7)
+			{
+				entity1 = hardConstraints[i].c1;
+				entity2 = hardConstraints[i].c2;
+				room1 = allocation[entity1];
+				room2 = allocation[entity2];
+				adjacent = false;
+				if (room1 == room2)
+				{
+					adjacent = true;
+				}
+				for (j = 0; j < rooms[room2].adjSize; j++)
+				{
+					if (room1 == rooms[room2].adjacentRooms[j])
+					{
+						adjacent = true;
+					}
+				}
+				if (adjacent == false)
+				{
+					printf("Se viola restriccion ADJACENCY_CONSTRAINT\n");
+					return true;
+				}
+			}
 			// Check hard restriction 8: NEARBY_CONSTRAINT
 			// Check hard restriction 9: AWAYFROM_CONSTRAINT
 		}
