@@ -13,7 +13,6 @@ struct Entity
 	int group;
 	float space;
 	int *availableRooms;
-	int lenghtAvailableRooms;
 };
 
 struct Room
@@ -31,9 +30,25 @@ struct Constraint
 	int type;
 	int c1;
 	int c2;
+	bool used;
 };
 
 // Functions
+
+void resetHardConstraints(struct Constraint *hardConstraints, int nHardConstraints)
+{
+	for (int i = 0; i < nHardConstraints; i++)
+	{
+		if (hardConstraints[i].type == 3)
+		{
+			hardConstraints[i].used = true;
+		}
+		else
+		{
+			hardConstraints[i].used = false;
+		}
+	}
+}
 
 void initialEntityData(struct Room *rooms, struct Entity *entities, int nRooms, int nEntities)
 {
@@ -44,12 +59,99 @@ void initialEntityData(struct Room *rooms, struct Entity *entities, int nRooms, 
 		{
 			entities[i].availableRooms[j] = j;
 		}
-		entities[i].lenghtAvailableRooms = nRooms;
 	}
 }
 
-bool violatesHard(int *allocation, struct Constraint *hardConstraints, struct Room *rooms, struct Entity *entities, int nHardConstraints, int nRooms, int nEntities, int *usedHard, int nUsedHard)
+bool violatesHard(int *allocation, struct Constraint *hardConstraints, struct Room *rooms, struct Entity *entities, int nHardConstraints, int nRooms, int nEntities)
 {
+	int i, j, entity1, entity2, room;
+	float space, totalUsed;
+	for (i = 0; i < nHardConstraints; i++)
+	{
+		if (hardConstraints[i].used)
+		{
+			// Check hard restriction 0: ALLOCATION_CONSTRAINT
+			if (hardConstraints[i].type == 0)
+			{
+				entity1 = hardConstraints[i].c1;
+				room = hardConstraints[i].c2;
+				if (allocation[entity1] != room)
+				{
+					return true;
+				}
+			}
+			// Check hard restriction 1: NONALLOCATION_CONSTRAINT
+			if (hardConstraints[i].type == 1)
+			{
+				entity1 = hardConstraints[i].c1;
+				room = hardConstraints[i].c2;
+				if (allocation[entity1] == room)
+				{
+					return true;
+				}
+			}
+			// Check hard restriction 3: CAPACITY_CONSTRAINT
+			if (hardConstraints[i].type == 3)
+			{
+				totalUsed = 0;
+				room = hardConstraints[i].c1;
+				space = rooms[room].space;
+				for (j = 0; j < nEntities; j++)
+				{
+					if (allocation[j] == room)
+					{
+						totalUsed = totalUsed + entities[j].space;
+					}
+				}
+				if (totalUsed > space)
+				{
+					return true;
+				}
+			}
+			// Check hard restriction 4: SAMEROOM_CONSTRAINT
+			if (hardConstraints[i].type == 4)
+			{
+				entity1 = hardConstraints[i].c1;
+				entity2 = hardConstraints[i].c2;
+				if (allocation[entity1] != allocation[entity2])
+				{
+					return true;
+				}
+			}
+			// Check hard restriction 5: NOTSAMEROOM_CONSTRAINT
+			if (hardConstraints[i].type == 5)
+			{
+				entity1 = hardConstraints[i].c1;
+				entity2 = hardConstraints[i].c2;
+				if (allocation[entity1] == allocation[entity2])
+				{
+					printf("Se viola restriccion NOTSAMEROOM_CONSTRAINT\n");
+					return true;
+				}
+			}
+			// Check hard restriction 6: NOTSHARING_CONSTRAINT
+			if (hardConstraints[i].type == 6)
+			{
+				entity1 = hardConstraints[i].c1;
+				room = allocation[entity1];
+				for (j = 0; j < nEntities; j++)
+				{
+					if (j != entity1)
+					{
+						if (allocation[j] == room)
+						{
+							printf("Se viola restriccion %d de tipo %d para la entidad %d en la habitación %d\n", i, hardConstraints[i].type, entity1, room);
+							return true;
+						}
+					}
+				}
+			}
+
+			// Check hard restriction 7: ADJACENCY_CONSTRAINT
+			// Check hard restriction 8: NEARBY_CONSTRAINT
+			// Check hard restriction 9: AWAYFROM_CONSTRAINT
+		}
+	}
 	return false;
 }
 
@@ -70,7 +172,6 @@ void resetAvailableRooms(struct Entity *entities, int nEntities, int nRooms)
 		{
 			entities[i].availableRooms[j] = j;
 		}
-		entities[i].lenghtAvailableRooms = nRooms;
 	}
 }
 
@@ -80,7 +181,18 @@ void resetAvailableEntities(int *availableEntities)
 
 int getRoom(struct Entity *entities, int nRooms, int index)
 {
-	int i, j, random, room, roomPicker[entities[index].lenghtAvailableRooms];
+	int i, j, random, room;
+
+	j = 0;
+	for (i = 0; i < nRooms; i++)
+	{
+		if (entities[index].availableRooms[i] != -1)
+		{
+			j++;
+		}
+	}
+
+	int roomPicker[j];
 
 	j = 0;
 	for (i = 0; i < nRooms; i++)
@@ -92,24 +204,33 @@ int getRoom(struct Entity *entities, int nRooms, int index)
 		}
 	}
 
-	random = rand() % entities[index].lenghtAvailableRooms;
+	random = rand() % j;
 	room = roomPicker[random];
 	entities[index].availableRooms[random] = -1;
-	entities[index].lenghtAvailableRooms--;
+	printf("Room picker out, return %d\n", room);
+	if (room > 91)
+	{
+		printf("Error\n");
+		for (int k = 0; k < nRooms; k++)
+		{
+			printf("Habitacion en available rooms: %d\n", entities[index].availableRooms[k]);
+		}
+
+		for (int k = 0; k < j; k++)
+		{
+			printf("Habitacion en room picker: %d\n", roomPicker[k]);
+		}
+	}
 
 	return room;
 }
 
 bool constructInitialSolution(int *allocation, struct Constraint *softConstraints, struct Constraint *hardConstraints, struct Room *rooms, struct Entity *entities, int nSoftConstraints, int nHardConstraints, int nRooms, int nEntities)
 {
-	bool allocated = false;
-	int i, j, k = 0, entity1, entity2, room, room2;
-	int *usedHardConstraints = malloc(sizeof(int) * nHardConstraints);
+	resetHardConstraints(hardConstraints, nHardConstraints);
 
-	for (i = 0; i < nHardConstraints; i++)
-	{
-		usedHardConstraints[i] = -1;
-	}
+	bool allocated = false;
+	int i, j, entity1, entity2, room, room2;
 
 	// Satisfy hard restriction 0: ALLOCATION_CONSTRAINT
 
@@ -124,14 +245,13 @@ bool constructInitialSolution(int *allocation, struct Constraint *softConstraint
 			if (allocation[entity1] == -1)
 			{
 				allocation[entity1] = room;
-				if (violatesHard(allocation, hardConstraints, rooms, entities, nHardConstraints, nRooms, nEntities, usedHardConstraints, k))
+				if (violatesHard(allocation, hardConstraints, rooms, entities, nHardConstraints, nRooms, nEntities))
 				{
 					return false;
 				}
 			}
 			resetAvailableRooms(entities, nEntities, nRooms);
-			usedHardConstraints[k] = i;
-			k++;
+			hardConstraints[i].used = true;
 		}
 	}
 
@@ -159,14 +279,13 @@ bool constructInitialSolution(int *allocation, struct Constraint *softConstraint
 				}
 				room = getRoom(entities, nRooms, entity1);
 				allocation[entity1] = room;
-				if (!violatesHard(allocation, hardConstraints, rooms, entities, nHardConstraints, nRooms, nEntities, usedHardConstraints, k))
+				if (!violatesHard(allocation, hardConstraints, rooms, entities, nHardConstraints, nRooms, nEntities))
 				{
 					allocated = true;
 					resetAvailableRooms(entities, nEntities, nRooms);
 				}
 			}
-			usedHardConstraints[k] = i;
-			k++;
+			hardConstraints[i].used = true;
 		}
 	}
 
@@ -184,14 +303,14 @@ bool constructInitialSolution(int *allocation, struct Constraint *softConstraint
 			if (allocation[entity1] != -1)
 			{
 				allocation[entity2] = allocation[entity1];
-				if (!violatesHard(allocation, hardConstraints, rooms, entities, nHardConstraints, nRooms, nEntities, usedHardConstraints, k))
+				if (!violatesHard(allocation, hardConstraints, rooms, entities, nHardConstraints, nRooms, nEntities))
 				{
 					allocated = true;
 				}
 			}
 			else if (allocation[entity2] != -1)
 			{
-				if (!violatesHard(allocation, hardConstraints, rooms, entities, nHardConstraints, nRooms, nEntities, usedHardConstraints, k))
+				if (!violatesHard(allocation, hardConstraints, rooms, entities, nHardConstraints, nRooms, nEntities))
 				{
 					allocated = true;
 				}
@@ -207,14 +326,13 @@ bool constructInitialSolution(int *allocation, struct Constraint *softConstraint
 				room = getRoom(entities, nRooms, entity1);
 				allocation[entity1] = room;
 				allocation[entity2] = room;
-				if (!violatesHard(allocation, hardConstraints, rooms, entities, nHardConstraints, nRooms, nEntities, usedHardConstraints, k))
+				if (!violatesHard(allocation, hardConstraints, rooms, entities, nHardConstraints, nRooms, nEntities))
 				{
 					allocated = true;
 					resetAvailableRooms(entities, nEntities, nRooms);
 				}
 			}
-			usedHardConstraints[k] = i;
-			k++;
+			hardConstraints[i].used = true;
 		}
 	}
 
@@ -243,7 +361,7 @@ bool constructInitialSolution(int *allocation, struct Constraint *softConstraint
 					{
 						room2 = rooms[room].adjacentRooms[j];
 						allocation[entity2] = room2;
-						if (!violatesHard(allocation, hardConstraints, rooms, entities, nHardConstraints, nRooms, nEntities, usedHardConstraints, k))
+						if (!violatesHard(allocation, hardConstraints, rooms, entities, nHardConstraints, nRooms, nEntities))
 						{
 							allocated = true;
 							resetAvailableRooms(entities, nEntities, nRooms);
@@ -251,8 +369,7 @@ bool constructInitialSolution(int *allocation, struct Constraint *softConstraint
 					}
 				}
 			}
-			usedHardConstraints[k] = i;
-			k++;
+			hardConstraints[i].used = true;
 		}
 	}
 
@@ -283,7 +400,7 @@ bool constructInitialSolution(int *allocation, struct Constraint *softConstraint
 						{
 							room2 = j;
 							allocation[entity2] = room2;
-							if (!violatesHard(allocation, hardConstraints, rooms, entities, nHardConstraints, nRooms, nEntities, usedHardConstraints, k))
+							if (!violatesHard(allocation, hardConstraints, rooms, entities, nHardConstraints, nRooms, nEntities))
 							{
 								allocated = true;
 								resetAvailableRooms(entities, nEntities, nRooms);
@@ -292,8 +409,7 @@ bool constructInitialSolution(int *allocation, struct Constraint *softConstraint
 					}
 				}
 			}
-			usedHardConstraints[k] = i;
-			k++;
+			hardConstraints[i].used = true;
 		}
 	}
 
@@ -336,7 +452,7 @@ bool constructInitialSolution(int *allocation, struct Constraint *softConstraint
 						{
 							room2 = j;
 							allocation[entity2] = room2;
-							if (!violatesHard(allocation, hardConstraints, rooms, entities, nHardConstraints, nRooms, nEntities, usedHardConstraints, k))
+							if (!violatesHard(allocation, hardConstraints, rooms, entities, nHardConstraints, nRooms, nEntities))
 							{
 								allocated = true;
 								resetAvailableRooms(entities, nEntities, nRooms);
@@ -345,8 +461,7 @@ bool constructInitialSolution(int *allocation, struct Constraint *softConstraint
 					}
 				}
 			}
-			usedHardConstraints[k] = i;
-			k++;
+			hardConstraints[i].used = true;
 		}
 	}
 
@@ -389,7 +504,7 @@ bool constructInitialSolution(int *allocation, struct Constraint *softConstraint
 						{
 							room2 = j;
 							allocation[entity2] = room2;
-							if (!violatesHard(allocation, hardConstraints, rooms, entities, nHardConstraints, nRooms, nEntities, usedHardConstraints, k))
+							if (!violatesHard(allocation, hardConstraints, rooms, entities, nHardConstraints, nRooms, nEntities))
 							{
 								allocated = true;
 								resetAvailableRooms(entities, nEntities, nRooms);
@@ -398,8 +513,7 @@ bool constructInitialSolution(int *allocation, struct Constraint *softConstraint
 					}
 				}
 			}
-			usedHardConstraints[k] = i;
-			k++;
+			hardConstraints[i].used = true;
 		}
 	}
 
@@ -429,15 +543,14 @@ bool constructInitialSolution(int *allocation, struct Constraint *softConstraint
 				room = getRoom(entities, nRooms, entity1);
 				if (room != room2)
 				{
-					if (!violatesHard(allocation, hardConstraints, rooms, entities, nHardConstraints, nRooms, nEntities, usedHardConstraints, k))
+					if (!violatesHard(allocation, hardConstraints, rooms, entities, nHardConstraints, nRooms, nEntities))
 					{
 						allocated = true;
 						resetAvailableRooms(entities, nEntities, nRooms);
 					}
 				}
 			}
-			usedHardConstraints[k] = i;
-			k++;
+			hardConstraints[i].used = true;
 		}
 	}
 
@@ -461,7 +574,7 @@ bool constructInitialSolution(int *allocation, struct Constraint *softConstraint
 				}
 				room = getRoom(entities, nRooms, entity1);
 				allocation[entity1] = room;
-				if (!violatesHard(allocation, hardConstraints, rooms, entities, nHardConstraints, nRooms, nEntities, usedHardConstraints, k))
+				if (!violatesHard(allocation, hardConstraints, rooms, entities, nHardConstraints, nRooms, nEntities))
 				{
 					allocated = true;
 					resetAvailableRooms(entities, nEntities, nRooms);
@@ -483,7 +596,7 @@ bool constructInitialSolution(int *allocation, struct Constraint *softConstraint
 			{
 				allocation[entity1] = room;
 				// If allocation violates a hard constraint
-				if (violatesHard(allocation, hardConstraints, rooms, entities, nHardConstraints, nRooms, nEntities, usedHardConstraints, k))
+				if (violatesHard(allocation, hardConstraints, rooms, entities, nHardConstraints, nRooms, nEntities))
 				{
 					allocation[entity1] = -1;
 				}
@@ -512,7 +625,7 @@ bool constructInitialSolution(int *allocation, struct Constraint *softConstraint
 				room = getRoom(entities, nRooms, entity1);
 				allocation[entity1] = room;
 				allocation[entity2] = room;
-				if (!violatesHard(allocation, hardConstraints, rooms, entities, nHardConstraints, nRooms, nEntities, usedHardConstraints, k))
+				if (!violatesHard(allocation, hardConstraints, rooms, entities, nHardConstraints, nRooms, nEntities))
 				{
 					allocated = true;
 					resetAvailableRooms(entities, nEntities, nRooms);
@@ -546,7 +659,7 @@ bool constructInitialSolution(int *allocation, struct Constraint *softConstraint
 					{
 						room2 = rooms[room].adjacentRooms[j];
 						allocation[entity2] = room2;
-						if (!violatesHard(allocation, hardConstraints, rooms, entities, nHardConstraints, nRooms, nEntities, usedHardConstraints, k))
+						if (!violatesHard(allocation, hardConstraints, rooms, entities, nHardConstraints, nRooms, nEntities))
 						{
 							allocated = true;
 							resetAvailableRooms(entities, nEntities, nRooms);
@@ -584,7 +697,7 @@ bool constructInitialSolution(int *allocation, struct Constraint *softConstraint
 						{
 							room2 = j;
 							allocation[entity2] = room2;
-							if (!violatesHard(allocation, hardConstraints, rooms, entities, nHardConstraints, nRooms, nEntities, usedHardConstraints, k))
+							if (!violatesHard(allocation, hardConstraints, rooms, entities, nHardConstraints, nRooms, nEntities))
 							{
 								allocated = true;
 								resetAvailableRooms(entities, nEntities, nRooms);
@@ -624,7 +737,7 @@ bool constructInitialSolution(int *allocation, struct Constraint *softConstraint
 				{
 					room = getRoom(entities, nRooms, i);
 					allocation[i] = room;
-					if (!violatesHard(allocation, hardConstraints, rooms, entities, nHardConstraints, nRooms, nEntities, usedHardConstraints, k))
+					if (!violatesHard(allocation, hardConstraints, rooms, entities, nHardConstraints, nRooms, nEntities))
 					{
 						allocated = true;
 						resetAvailableRooms(entities, nEntities, nRooms);
@@ -775,6 +888,16 @@ int main(int argc, char **argv)
 		}
 		i++;
 	}
+
+	j = 0;
+	for (i = 0; i < nHardConstraints; i++)
+	{
+		if (hardConstraints[i].type == 6)
+		{
+			j++;
+		}
+	}
+	printf("Existen %d restricciones duras del tipo 6\n", j);
 
 	// Initial available rooms for every entity
 
