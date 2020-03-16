@@ -1,3 +1,5 @@
+// Hill Climbing + First Improvement Algorithm
+
 // Imports
 
 #include <stdbool.h>
@@ -126,7 +128,6 @@ bool violatesHard(int *allocation, struct Constraint *hardConstraints, struct Ro
 				entity2 = hardConstraints[i].c2;
 				if (allocation[entity1] == allocation[entity2])
 				{
-					printf("Se viola restriccion NOTSAMEROOM_CONSTRAINT\n");
 					return true;
 				}
 			}
@@ -141,7 +142,6 @@ bool violatesHard(int *allocation, struct Constraint *hardConstraints, struct Ro
 					{
 						if (allocation[j] == room)
 						{
-							printf("Se viola restriccion NOTSHARING_CONSTRAINT\n");
 							return true;
 						}
 					}
@@ -169,20 +169,172 @@ bool violatesHard(int *allocation, struct Constraint *hardConstraints, struct Ro
 				}
 				if (adjacent == false)
 				{
-					printf("Se viola restriccion ADJACENCY_CONSTRAINT\n");
 					return true;
 				}
 			}
 			// Check hard restriction 8: NEARBY_CONSTRAINT
+			if (hardConstraints[i].type == 8)
+			{
+				entity1 = hardConstraints[i].c1;
+				entity2 = hardConstraints[i].c2;
+				room1 = allocation[entity1];
+				room2 = allocation[entity2];
+				if (rooms[room1].floor != rooms[room2].floor)
+				{
+					return true;
+				}
+			}
 			// Check hard restriction 9: AWAYFROM_CONSTRAINT
+			if (hardConstraints[i].type == 8)
+			{
+				entity1 = hardConstraints[i].c1;
+				entity2 = hardConstraints[i].c2;
+				room1 = allocation[entity1];
+				room2 = allocation[entity2];
+				if (rooms[room1].floor == rooms[room2].floor)
+				{
+					return true;
+				}
+			}
 		}
 	}
 	return false;
 }
 
-int evaluationFunction(int *allocation, struct Constraint *softConstraints, struct Room *rooms, struct Entity *entities)
+int evaluationFunction(int *penalties, int *allocation, struct Constraint *softConstraints, struct Room *rooms, struct Entity *entities, int nSoftConstraints, int nRooms, int nEntities)
 {
-	return 99999;
+	int i, j, entity1, entity2, room, room1, room2, quality;
+	float space, totalUsed;
+	bool adjacent;
+	quality = 0;
+	for (i = 0; i < nSoftConstraints; i++)
+	{
+		// Check soft restriction 0: ALLOCATION_CONSTRAINT
+		if (softConstraints[i].type == 0)
+		{
+			entity1 = softConstraints[i].c1;
+			room = softConstraints[i].c2;
+			if (allocation[entity1] != room)
+			{
+				quality = quality + penalties[softConstraints[i].type];
+			}
+		}
+		// Check soft restriction 1: NONALLOCATION_CONSTRAINT
+		if (softConstraints[i].type == 1)
+		{
+			entity1 = softConstraints[i].c1;
+			room = softConstraints[i].c2;
+			if (allocation[entity1] == room)
+			{
+				quality = quality + penalties[softConstraints[i].type];
+			}
+		}
+		// Check soft restriction 3: CAPACITY_CONSTRAINT
+		if (softConstraints[i].type == 3)
+		{
+			totalUsed = 0;
+			room = softConstraints[i].c1;
+			space = rooms[room].space;
+			for (j = 0; j < nEntities; j++)
+			{
+				if (allocation[j] == room)
+				{
+					totalUsed = totalUsed + entities[j].space;
+				}
+			}
+			if (totalUsed > space)
+			{
+				quality = quality + penalties[softConstraints[i].type];
+			}
+		}
+		// Check soft restriction 4: SAMEROOM_CONSTRAINT
+		if (softConstraints[i].type == 4)
+		{
+			entity1 = softConstraints[i].c1;
+			entity2 = softConstraints[i].c2;
+			if (allocation[entity1] != allocation[entity2])
+			{
+				quality = quality + penalties[softConstraints[i].type];
+			}
+		}
+		// Check soft restriction 5: NOTSAMEROOM_CONSTRAINT
+		if (softConstraints[i].type == 5)
+		{
+			entity1 = softConstraints[i].c1;
+			entity2 = softConstraints[i].c2;
+			if (allocation[entity1] == allocation[entity2])
+			{
+				quality = quality + penalties[softConstraints[i].type];
+			}
+		}
+		// Check soft restriction 6: NOTSHARING_CONSTRAINT
+		if (softConstraints[i].type == 6)
+		{
+			entity1 = softConstraints[i].c1;
+			room = allocation[entity1];
+			for (j = 0; j < nEntities; j++)
+			{
+				if (j != entity1)
+				{
+					if (allocation[j] == room)
+					{
+						quality = quality + penalties[softConstraints[i].type];
+					}
+				}
+			}
+		}
+
+		// Check soft restriction 7: ADJACENCY_CONSTRAINT
+		if (softConstraints[i].type == 7)
+		{
+			entity1 = softConstraints[i].c1;
+			entity2 = softConstraints[i].c2;
+			room1 = allocation[entity1];
+			room2 = allocation[entity2];
+			adjacent = false;
+			if (room1 == room2)
+			{
+				adjacent = true;
+			}
+			for (j = 0; j < rooms[room2].adjSize; j++)
+			{
+				if (room1 == rooms[room2].adjacentRooms[j])
+				{
+					adjacent = true;
+				}
+			}
+			if (adjacent == false)
+			{
+				quality = quality + penalties[softConstraints[i].type];
+			}
+		}
+		// Check soft restriction 8: NEARBY_CONSTRAINT
+		if (softConstraints[i].type == 8)
+		{
+			entity1 = softConstraints[i].c1;
+			entity2 = softConstraints[i].c2;
+			room1 = allocation[entity1];
+			room2 = allocation[entity2];
+			if (rooms[room1].floor != rooms[room2].floor)
+			{
+				quality = quality + penalties[softConstraints[i].type];
+			}
+		}
+		// Check soft restriction 9: AWAYFROM_CONSTRAINT
+		if (softConstraints[i].type == 8)
+		{
+			entity1 = softConstraints[i].c1;
+			entity2 = softConstraints[i].c2;
+			room1 = allocation[entity1];
+			room2 = allocation[entity2];
+			if (rooms[room1].floor == rooms[room2].floor)
+			{
+				quality = quality + penalties[softConstraints[i].type];
+			}
+		}
+	}
+
+	return quality;
 }
 
 void checkNeighborhood(int *allocation, struct Entity *entities, int *availableEntities)
@@ -236,21 +388,7 @@ int getRoom(struct Entity *entities, int nRooms, int index)
 
 	random = rand() % j;
 	room = roomPicker[random];
-	entities[index].availableRooms[random] = -1;
-	printf("Room picker out, return %d\n", room);
-	if (room > 91)
-	{
-		printf("Error\n");
-		for (int k = 0; k < nRooms; k++)
-		{
-			printf("Habitacion en available rooms: %d\n", entities[index].availableRooms[k]);
-		}
-
-		for (int k = 0; k < j; k++)
-		{
-			printf("Habitacion en room picker: %d\n", roomPicker[k]);
-		}
-	}
+	entities[index].availableRooms[room] = -1;
 
 	return room;
 }
@@ -752,7 +890,6 @@ bool constructInitialSolution(int *allocation, struct Constraint *softConstraint
 	{
 		if (allocation[i] == -1)
 		{
-			printf("Entidad %d no estaba asignada\n", i);
 			allocated = false;
 			j++;
 			while (!allocated)
@@ -768,12 +905,10 @@ bool constructInitialSolution(int *allocation, struct Constraint *softConstraint
 				{
 					allocated = true;
 					resetAvailableRooms(entities, nEntities, nRooms);
-					printf("***Entidad %d asignada a habitación %d\n", i, room);
 				}
 			}
 		}
 	}
-	printf("%d entidades no estaban asignadas antes de usar la ultima restricción\n", j);
 	return true;
 }
 
@@ -794,7 +929,7 @@ int main(int argc, char **argv)
 	char buffer[255], numberOf[50];
 	int nEntities, nRooms, nConstraints, nHardConstraints, nSoftConstraints;
 	int i, j, k, n;
-	// int penalties[] = {20, 10, 10, 10, 10, 10, 50, 10, 10, 10};
+	int penalties[] = {20, 10, 10, 10, 10, 10, 50, 10, 10, 10};
 	struct Entity *entities;
 	struct Room *rooms;
 	struct Constraint *hardConstraints;
@@ -915,26 +1050,14 @@ int main(int argc, char **argv)
 		i++;
 	}
 
-	j = 0;
-	for (i = 0; i < nHardConstraints; i++)
-	{
-		if (hardConstraints[i].type == 6)
-		{
-			j++;
-		}
-	}
-	printf("Existen %d restricciones duras del tipo 6\n", j);
-
 	// Initial available rooms for every entity
 
 	initialEntityData(rooms, entities, nRooms, nEntities);
 
-	// Hill Climbing + First Improvement Algorithm
-
 	// int bestSolQuality = 32000;
-	int *bestSol = malloc(sizeof(int) * nEntities);
+	int *bestSol = malloc(sizeof(int) * nEntities), bestQuality;
 
-	int *allocation = malloc(sizeof(int) * nEntities);
+	int *allocation = malloc(sizeof(int) * nEntities), quality;
 
 	for (i = 0; i < nEntities; i++)
 	{
@@ -955,6 +1078,10 @@ int main(int argc, char **argv)
 		printf("%d ", allocation[i]);
 	}
 	printf("\n");
+
+	quality = evaluationFunction(penalties, allocation, softConstraints, rooms, entities, nSoftConstraints, nRooms, nEntities);
+
+	printf("Calidad de la solución inicial: %d\n", quality);
 
 	// Free memory
 
