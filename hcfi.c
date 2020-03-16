@@ -48,9 +48,68 @@ void initialEntityData(struct Room *rooms, struct Entity *entities, int nRooms, 
 	}
 }
 
-void constructInitialSolution(int *allocation, struct Constraint *softConstraints, struct Constraint *hardConstraints, struct Room *rooms, struct Entity *entities, int nSoftConstraints, int nHardConstraints, int nRooms, int nEntities)
+bool violatesHard(int *allocation, struct Constraint *hardConstraints, struct Room *rooms, struct Entity *entities, int nHardConstraints, int nRooms, int nEntities, int *usedHard, int nUsedHard)
 {
-	int i, entity1, entity2, room, floor;
+	return false;
+}
+
+int evaluationFunction(int *allocation, struct Constraint *softConstraints, struct Room *rooms, struct Entity *entities)
+{
+	return 99999;
+}
+
+void checkNeighborhood(int *allocation, struct Entity *entities, int *availableEntities)
+{
+}
+
+void resetAvailableRooms(struct Entity *entities, int nEntities, int nRooms)
+{
+	for (int i = 0; i < nEntities; i++)
+	{
+		for (int j = 0; j < nRooms; j++)
+		{
+			entities[i].availableRooms[j] = j;
+		}
+		entities[i].lenghtAvailableRooms = nRooms;
+	}
+}
+
+void resetAvailableEntities(int *availableEntities)
+{
+}
+
+int getRoom(struct Entity *entities, int nRooms, int index)
+{
+	int i, j, random, room, roomPicker[entities[index].lenghtAvailableRooms];
+
+	j = 0;
+	for (i = 0; i < nRooms; i++)
+	{
+		if (entities[index].availableRooms[i] != -1)
+		{
+			roomPicker[j] = entities[index].availableRooms[i];
+			j++;
+		}
+	}
+
+	random = rand() % entities[index].lenghtAvailableRooms;
+	room = roomPicker[random];
+	entities[index].availableRooms[random] = -1;
+	entities[index].lenghtAvailableRooms--;
+
+	return room;
+}
+
+bool constructInitialSolution(int *allocation, struct Constraint *softConstraints, struct Constraint *hardConstraints, struct Room *rooms, struct Entity *entities, int nSoftConstraints, int nHardConstraints, int nRooms, int nEntities)
+{
+	bool allocated = false;
+	int i, j, k = 0, entity1, entity2, room, room2;
+	int *usedHardConstraints = malloc(sizeof(int) * nHardConstraints);
+
+	for (i = 0; i < nHardConstraints; i++)
+	{
+		usedHardConstraints[i] = -1;
+	}
 
 	// Satisfy hard restriction 0: ALLOCATION_CONSTRAINT
 
@@ -62,26 +121,354 @@ void constructInitialSolution(int *allocation, struct Constraint *softConstraint
 			entity1 = hardConstraints[i].c1;
 			// Room
 			room = hardConstraints[i].c2;
-			if (allocation[entity1] == 0)
+			if (allocation[entity1] == -1)
 			{
 				allocation[entity1] = room;
+				if (violatesHard(allocation, hardConstraints, rooms, entities, nHardConstraints, nRooms, nEntities, usedHardConstraints, k))
+				{
+					return false;
+				}
 			}
+			resetAvailableRooms(entities, nEntities, nRooms);
+			usedHardConstraints[k] = i;
+			k++;
+		}
+	}
+
+	// Satisfy hard restriction 6: NOTSHARING_CONSTRAINT
+
+	for (i = 0; i < nHardConstraints; i++)
+	{
+		if (hardConstraints[i].type == 6)
+		{
+			entity1 = hardConstraints[i].c1;
+
+			allocated = false;
+
+			if (allocation[entity1] != -1)
+			{
+				allocated = true;
+			}
+
+			while (!allocated)
+			{
+				if (entities[entity1].lenghtAvailableRooms == 0)
+				{
+					printf("Entidad %d no pudo ser asignada\n", i);
+					return false;
+				}
+				room = getRoom(entities, nRooms, entity1);
+				allocation[entity1] = room;
+				if (!violatesHard(allocation, hardConstraints, rooms, entities, nHardConstraints, nRooms, nEntities, usedHardConstraints, k))
+				{
+					allocated = true;
+					resetAvailableRooms(entities, nEntities, nRooms);
+				}
+			}
+			usedHardConstraints[k] = i;
+			k++;
 		}
 	}
 
 	// Satisfy hard restriction 4: SAMEROOM_CONSTRAINT
 
+	for (i = 0; i < nHardConstraints; i++)
+	{
+		if (hardConstraints[i].type == 4)
+		{
+			entity1 = hardConstraints[i].c1;
+			entity2 = hardConstraints[i].c2;
+
+			allocated = false;
+
+			if (allocation[entity1] != -1)
+			{
+				allocation[entity2] = allocation[entity1];
+				if (!violatesHard(allocation, hardConstraints, rooms, entities, nHardConstraints, nRooms, nEntities, usedHardConstraints, k))
+				{
+					allocated = true;
+				}
+			}
+			else if (allocation[entity2] != -1)
+			{
+				if (!violatesHard(allocation, hardConstraints, rooms, entities, nHardConstraints, nRooms, nEntities, usedHardConstraints, k))
+				{
+					allocated = true;
+				}
+			}
+
+			while (!allocated)
+			{
+				if (entities[entity1].lenghtAvailableRooms == 0)
+				{
+					printf("Entidad %d no pudo ser asignada\n", i);
+					return false;
+				}
+				room = getRoom(entities, nRooms, entity1);
+				allocation[entity1] = room;
+				allocation[entity2] = room;
+				if (!violatesHard(allocation, hardConstraints, rooms, entities, nHardConstraints, nRooms, nEntities, usedHardConstraints, k))
+				{
+					allocated = true;
+					resetAvailableRooms(entities, nEntities, nRooms);
+				}
+			}
+			usedHardConstraints[k] = i;
+			k++;
+		}
+	}
+
 	// Satisfy hard restriction 7: ADJACENCY_CONSTRAINT
+
+	for (i = 0; i < nHardConstraints; i++)
+	{
+		if (hardConstraints[i].type == 7)
+		{
+			entity1 = hardConstraints[i].c1;
+			entity2 = hardConstraints[i].c2;
+
+			allocated = false;
+			while (!allocated)
+			{
+				if (entities[entity1].lenghtAvailableRooms == 0)
+				{
+					printf("Entidad %d no pudo ser asignada\n", i);
+					return false;
+				}
+				room = getRoom(entities, nRooms, entity1);
+				allocation[entity1] = room;
+				for (j = 0; j < rooms[room].adjSize; j++)
+				{
+					if (!allocated)
+					{
+						room2 = rooms[room].adjacentRooms[j];
+						allocation[entity2] = room2;
+						if (!violatesHard(allocation, hardConstraints, rooms, entities, nHardConstraints, nRooms, nEntities, usedHardConstraints, k))
+						{
+							allocated = true;
+							resetAvailableRooms(entities, nEntities, nRooms);
+						}
+					}
+				}
+			}
+			usedHardConstraints[k] = i;
+			k++;
+		}
+	}
 
 	// Satisfy hard restriction 8: NEARBY_CONSTRAINT
 
-	// Satisfy hard restriction 6: NOTSHARING_CONSTRAINT
+	for (i = 0; i < nHardConstraints; i++)
+	{
+		if (hardConstraints[i].type == 8)
+		{
+			entity1 = hardConstraints[i].c1;
+			entity2 = hardConstraints[i].c2;
+
+			allocated = false;
+			while (!allocated)
+			{
+				if (entities[entity1].lenghtAvailableRooms == 0)
+				{
+					printf("Entidad %d no pudo ser asignada\n", i);
+					return false;
+				}
+				room = getRoom(entities, nRooms, entity1);
+				allocation[entity1] = room;
+				for (j = 0; j < nRooms; j++)
+				{
+					if (!allocated)
+					{
+						if (rooms[room].floor == rooms[j].floor)
+						{
+							room2 = j;
+							allocation[entity2] = room2;
+							if (!violatesHard(allocation, hardConstraints, rooms, entities, nHardConstraints, nRooms, nEntities, usedHardConstraints, k))
+							{
+								allocated = true;
+								resetAvailableRooms(entities, nEntities, nRooms);
+							}
+						}
+					}
+				}
+			}
+			usedHardConstraints[k] = i;
+			k++;
+		}
+	}
 
 	// Satisfy hard restriction 9: AWAYFROM_CONSTRAINT
 
+	for (i = 0; i < nHardConstraints; i++)
+	{
+		if (hardConstraints[i].type == 9)
+		{
+			entity1 = hardConstraints[i].c1;
+			entity2 = hardConstraints[i].c2;
+
+			allocated = false;
+
+			if (allocation[entity1] != -1)
+			{
+				if (allocation[entity2] != -1)
+				{
+					if (rooms[allocation[entity1]].floor != rooms[allocation[entity2]].floor)
+					{
+						allocated = true;
+					}
+				}
+			}
+
+			while (!allocated)
+			{
+				if (entities[entity1].lenghtAvailableRooms == 0)
+				{
+					printf("Entidad %d no pudo ser asignada\n", i);
+					return false;
+				}
+				room = getRoom(entities, nRooms, entity1);
+				allocation[entity1] = room;
+				for (j = 0; j < nRooms; j++)
+				{
+					if (!allocated)
+					{
+						if (rooms[room].floor != rooms[j].floor)
+						{
+							room2 = j;
+							allocation[entity2] = room2;
+							if (!violatesHard(allocation, hardConstraints, rooms, entities, nHardConstraints, nRooms, nEntities, usedHardConstraints, k))
+							{
+								allocated = true;
+								resetAvailableRooms(entities, nEntities, nRooms);
+							}
+						}
+					}
+				}
+			}
+			usedHardConstraints[k] = i;
+			k++;
+		}
+	}
+
 	// Satisfy hard restriction 5: NOTSAMEROOM_CONSTRAINT
 
+	for (i = 0; i < nHardConstraints; i++)
+	{
+		if (hardConstraints[i].type == 5)
+		{
+			entity1 = hardConstraints[i].c1;
+			entity2 = hardConstraints[i].c2;
+
+			allocated = false;
+
+			if (allocation[entity1] != -1)
+			{
+				if (allocation[entity2] != -1)
+				{
+					if (allocation[entity1] != allocation[entity2])
+					{
+						allocated = true;
+					}
+				}
+			}
+
+			while (!allocated)
+			{
+				if (entities[entity1].lenghtAvailableRooms == 0)
+				{
+					printf("Entidad %d no pudo ser asignada\n", i);
+					return false;
+				}
+				room = getRoom(entities, nRooms, entity1);
+				allocation[entity1] = room;
+				for (j = 0; j < nRooms; j++)
+				{
+					if (!allocated)
+					{
+						if (allocation[entity1] != j)
+						{
+							room2 = j;
+							allocation[entity2] = room2;
+							if (!violatesHard(allocation, hardConstraints, rooms, entities, nHardConstraints, nRooms, nEntities, usedHardConstraints, k))
+							{
+								allocated = true;
+								resetAvailableRooms(entities, nEntities, nRooms);
+							}
+						}
+					}
+				}
+			}
+			usedHardConstraints[k] = i;
+			k++;
+		}
+	}
+
 	// Satisfy hard restriction 1: NONALLOCATION_CONSTRAINT
+
+	for (i = 0; i < nHardConstraints; i++)
+	{
+		if (hardConstraints[i].type == 1)
+		{
+			entity1 = hardConstraints[i].c1;
+			room2 = hardConstraints[i].c2;
+			allocation = false;
+			if (allocation[entity1] == -1)
+			{
+				if (allocation[entity1] != room2)
+				{
+					allocated = true;
+				}
+			}
+			while (!allocation)
+			{
+				if (entities[entity1].lenghtAvailableRooms == 0)
+				{
+					printf("Entidad %d no pudo ser asignada\n", i);
+					return false;
+				}
+				room = getRoom(entities, nRooms, entity1);
+				if (room != room2)
+				{
+					if (!violatesHard(allocation, hardConstraints, rooms, entities, nHardConstraints, nRooms, nEntities, usedHardConstraints, k))
+					{
+						allocated = true;
+						resetAvailableRooms(entities, nEntities, nRooms);
+					}
+				}
+			}
+			usedHardConstraints[k] = i;
+			k++;
+		}
+	}
+
+	// Soft restrictions
+
+	// Satisfy soft restriction 6: NOTSHARING_CONSTRAINT
+
+	for (i = 0; i < nSoftConstraints; i++)
+	{
+		if (softConstraints[i].type == 6)
+		{
+			entity1 = softConstraints[i].c1;
+
+			allocated = false;
+			while (!allocated)
+			{
+				if (entities[entity1].lenghtAvailableRooms == 0)
+				{
+					printf("Entidad %d no pudo ser asignada\n", i);
+					return false;
+				}
+				room = getRoom(entities, nRooms, entity1);
+				allocation[entity1] = room;
+				if (!violatesHard(allocation, hardConstraints, rooms, entities, nHardConstraints, nRooms, nEntities, usedHardConstraints, k))
+				{
+					allocated = true;
+					resetAvailableRooms(entities, nEntities, nRooms);
+				}
+			}
+		}
+	}
 
 	// Satisfy soft restriction 0: ALLOCATION_CONSTRAINT
 
@@ -89,50 +476,166 @@ void constructInitialSolution(int *allocation, struct Constraint *softConstraint
 	{
 		if (softConstraints[i].type == 0)
 		{
-			// Entity
 			entity1 = softConstraints[i].c1;
-			// Room
 			room = softConstraints[i].c2;
-			if (allocation[entity1] == 0)
+
+			if (allocation[entity1] == -1)
 			{
 				allocation[entity1] = room;
+				// If allocation violates a hard constraint
+				if (violatesHard(allocation, hardConstraints, rooms, entities, nHardConstraints, nRooms, nEntities, usedHardConstraints, k))
+				{
+					allocation[entity1] = -1;
+				}
 			}
+			resetAvailableRooms(entities, nEntities, nRooms);
 		}
 	}
 
 	// Satisfy soft restriction 4: SAMEROOM_CONSTRAINT
 
+	for (i = 0; i < nSoftConstraints; i++)
+	{
+		if (softConstraints[i].type == 4)
+		{
+			entity1 = softConstraints[i].c1;
+			entity2 = softConstraints[i].c2;
+
+			allocated = false;
+			while (!allocated)
+			{
+				if (entities[entity1].lenghtAvailableRooms == 0)
+				{
+					printf("Entidad %d no pudo ser asignada\n", i);
+					return false;
+				}
+				room = getRoom(entities, nRooms, entity1);
+				allocation[entity1] = room;
+				allocation[entity2] = room;
+				if (!violatesHard(allocation, hardConstraints, rooms, entities, nHardConstraints, nRooms, nEntities, usedHardConstraints, k))
+				{
+					allocated = true;
+					resetAvailableRooms(entities, nEntities, nRooms);
+				}
+			}
+		}
+	}
+
 	// Satisfy soft restriction 7: ADJACENCY_CONSTRAINT
+
+	for (i = 0; i < nSoftConstraints; i++)
+	{
+		if (softConstraints[i].type == 7)
+		{
+			entity1 = softConstraints[i].c1;
+			entity2 = softConstraints[i].c2;
+
+			allocated = false;
+			while (!allocated)
+			{
+				if (entities[entity1].lenghtAvailableRooms == 0)
+				{
+					printf("Entidad %d no pudo ser asignada\n", i);
+					return false;
+				}
+				room = getRoom(entities, nRooms, entity1);
+				allocation[entity1] = room;
+				for (j = 0; j < rooms[room].adjSize; j++)
+				{
+					if (!allocated)
+					{
+						room2 = rooms[room].adjacentRooms[j];
+						allocation[entity2] = room2;
+						if (!violatesHard(allocation, hardConstraints, rooms, entities, nHardConstraints, nRooms, nEntities, usedHardConstraints, k))
+						{
+							allocated = true;
+							resetAvailableRooms(entities, nEntities, nRooms);
+						}
+					}
+				}
+			}
+		}
+	}
 
 	// Satisfy soft restriction 8: NEARBY_CONSTRAINT
 
-	// Satisfy soft restriction 6: NOTSHARING_CONSTRAINT
+	for (i = 0; i < nSoftConstraints; i++)
+	{
+		if (softConstraints[i].type == 8)
+		{
+			entity1 = softConstraints[i].c1;
+			entity2 = softConstraints[i].c2;
+
+			allocated = false;
+			while (!allocated)
+			{
+				if (entities[entity1].lenghtAvailableRooms == 0)
+				{
+					printf("Entidad %d no pudo ser asignada\n", i);
+					return false;
+				}
+				room = getRoom(entities, nRooms, entity1);
+				allocation[entity1] = room;
+				for (j = 0; j < nRooms; j++)
+				{
+					if (!allocated)
+					{
+						if (rooms[room].floor == rooms[j].floor)
+						{
+							room2 = j;
+							allocation[entity2] = room2;
+							if (!violatesHard(allocation, hardConstraints, rooms, entities, nHardConstraints, nRooms, nEntities, usedHardConstraints, k))
+							{
+								allocated = true;
+								resetAvailableRooms(entities, nEntities, nRooms);
+							}
+						}
+					}
+				}
+			}
+		}
+	}
 
 	// Satisfy soft restriction 9: AWAYFROM_CONSTRAINT
 
 	// Satisfy soft restriction 5: NOTSAMEROOM_CONSTRAINT
 
 	// Satisfy soft restriction 1: NONALLOCATION_CONSTRAINT
-}
 
-void checkHard(int *allocation, struct Constraint *hardConstraints, struct Room *rooms, struct Entity *entities)
-{
-}
+	// Entities must be allocated
 
-int evaluationFunction(int *allocation, struct Constraint *softConstraints, struct Room *rooms, struct Entity *entities)
-{
-}
+	j = 0;
+	for (i = 0; i < nEntities; i++)
+	{
+		if (allocation[i] == -1)
+		{
+			printf("Entidad %d no estaba asignada\n", i);
+			allocated = false;
+			j++;
+			while (!allocated)
+			{
 
-void checkNeighborhood(int *allocation, struct Entity *entities, int *availableEntities)
-{
-}
-
-void resetAvailableRooms(struct Entity *entities)
-{
-}
-
-void resetAvailableEntities(int *availableEntities)
-{
+				if (entities[entity1].lenghtAvailableRooms == 0)
+				{
+					printf("Entidad %d no pudo ser asignada\n", i);
+					return false;
+				}
+				else
+				{
+					room = getRoom(entities, nRooms, i);
+					allocation[i] = room;
+					if (!violatesHard(allocation, hardConstraints, rooms, entities, nHardConstraints, nRooms, nEntities, usedHardConstraints, k))
+					{
+						allocated = true;
+						resetAvailableRooms(entities, nEntities, nRooms);
+						printf("***Entidad %d asignada a habitación %d\n", i, room);
+					}
+				}
+			}
+		}
+	}
+	printf("%d entidades no estaban asignadas antes de usar la ultima restricción\n", j);
+	return true;
 }
 
 // Main
@@ -150,8 +653,9 @@ int main(int argc, char **argv)
 	}
 
 	char buffer[255], numberOf[50];
-	int penalties[] = {20, 10, 10, 10, 10, 10, 50, 10, 10, 10}, nEntities, nRooms, nFloors, nConstraints, nHardConstraints, nSoftConstraints;
+	int nEntities, nRooms, nConstraints, nHardConstraints, nSoftConstraints;
 	int i, j, k, n;
+	// int penalties[] = {20, 10, 10, 10, 10, 10, 50, 10, 10, 10};
 	struct Entity *entities;
 	struct Room *rooms;
 	struct Constraint *hardConstraints;
@@ -177,9 +681,9 @@ int main(int argc, char **argv)
 				rooms = malloc(sizeof(struct Room) * n);
 				break;
 
-			case 2:
-				nFloors = n;
-				break;
+				// case 2:
+				// 	nFloors = n;
+				// 	break;
 
 			case 3:
 				nConstraints = n;
@@ -278,24 +782,24 @@ int main(int argc, char **argv)
 
 	// Hill Climbing + First Improvement Algorithm
 
-	int bestSolQuality = 32000;
+	// int bestSolQuality = 32000;
 	int *bestSol = malloc(sizeof(int) * nEntities);
 
 	int *allocation = malloc(sizeof(int) * nEntities);
 
 	for (i = 0; i < nEntities; i++)
 	{
-		allocation[i] = 0;
+		allocation[i] = -1;
 	}
 
-	for (i = 0; i < nEntities; i++)
+	if (constructInitialSolution(allocation, softConstraints, hardConstraints, rooms, entities, nSoftConstraints, nHardConstraints, nRooms, nEntities))
 	{
-		printf("%d ", allocation[i]);
+		printf("Solución inicial creada correctamente\n");
 	}
-
-	printf("\n ***** \n");
-
-	constructInitialSolution(allocation, softConstraints, hardConstraints, rooms, entities, nSoftConstraints, nHardConstraints, nRooms, nEntities);
+	else
+	{
+		printf("Fallo en solución inicial\n");
+	}
 
 	for (i = 0; i < nEntities; i++)
 	{
