@@ -37,6 +37,15 @@ struct Constraint
 
 // Functions
 
+void showSolution(int *allocation, int nEntities)
+{
+	for (int i = 0; i < nEntities; i++)
+	{
+		printf("%d ", allocation[i]);
+	}
+	printf("\n");
+}
+
 void resetHardConstraints(struct Constraint *hardConstraints, int nHardConstraints)
 {
 	for (int i = 0; i < nHardConstraints; i++)
@@ -147,7 +156,6 @@ bool violatesHard(int *allocation, struct Constraint *hardConstraints, struct Ro
 					}
 				}
 			}
-
 			// Check hard restriction 7: ADJACENCY_CONSTRAINT
 			if (hardConstraints[i].type == 7)
 			{
@@ -155,6 +163,14 @@ bool violatesHard(int *allocation, struct Constraint *hardConstraints, struct Ro
 				entity2 = hardConstraints[i].c2;
 				room1 = allocation[entity1];
 				room2 = allocation[entity2];
+				if (room1 == -1)
+				{
+					return true;
+				}
+				if (room2 == -1)
+				{
+					return true;
+				}
 				adjacent = false;
 				if (room1 == room2)
 				{
@@ -389,7 +405,6 @@ int getRoom(struct Entity *entities, int nRooms, int index)
 	random = rand() % j;
 	room = roomPicker[random];
 	entities[index].availableRooms[room] = -1;
-	printf("Picked room %d\n", room);
 	return room;
 }
 
@@ -445,7 +460,7 @@ bool constructInitialSolution(int *allocation, struct Constraint *softConstraint
 				room = getRoom(entities, nRooms, entity1);
 				if (room == -1)
 				{
-					printf("Entidad %d no pudo ser asignada NOTSHARING_CONSTRAINT\n", i);
+					// printf("Entidad %d no pudo ser asignada NOTSHARING_CONSTRAINT\n", i);
 					return false;
 				}
 				allocation[entity1] = room;
@@ -506,7 +521,7 @@ bool constructInitialSolution(int *allocation, struct Constraint *softConstraint
 				room = getRoom(entities, nRooms, entity1);
 				if (room == -1)
 				{
-					printf("Entidad %d no pudo ser asignada SAMEROOM_CONSTRAINT\n", i);
+					// printf("Entidad %d no pudo ser asignada SAMEROOM_CONSTRAINT\n", i);
 					return false;
 				}
 				allocation[entity1] = room;
@@ -536,14 +551,12 @@ bool constructInitialSolution(int *allocation, struct Constraint *softConstraint
 
 			entity1 = hardConstraints[i].c1;
 			entity2 = hardConstraints[i].c2;
-			room1 = allocation[entity1];
-			room2 = allocation[entity2];
 			while (!allocated)
 			{
 				room = getRoom(entities, nRooms, entity1);
 				if (room == -1)
 				{
-					printf("Entidad %d no pudo ser asignada ADJACENCY_CONSTRAINT\n", i);
+					// printf("Entidad %d no pudo ser asignada ADJACENCY_CONSTRAINT\n", i);
 					return false;
 				}
 				allocation[entity1] = room;
@@ -584,7 +597,7 @@ bool constructInitialSolution(int *allocation, struct Constraint *softConstraint
 				room = getRoom(entities, nRooms, entity1);
 				if (room == -1)
 				{
-					printf("Entidad %d no pudo ser asignada NEARBY_CONSTRAINT\n", i);
+					// printf("Entidad %d no pudo ser asignada NEARBY_CONSTRAINT\n", i);
 					return false;
 				}
 				allocation[entity1] = room;
@@ -607,7 +620,6 @@ bool constructInitialSolution(int *allocation, struct Constraint *softConstraint
 			}
 		}
 	}
-
 	// Satisfy hard restriction 9: AWAYFROM_CONSTRAINT
 
 	for (i = 0; i < nHardConstraints; i++)
@@ -640,7 +652,7 @@ bool constructInitialSolution(int *allocation, struct Constraint *softConstraint
 				room = getRoom(entities, nRooms, entity1);
 				if (room == -1)
 				{
-					printf("Entidad %d no pudo ser asignada AWAYFROM_CONSTRAINT\n", i);
+					// printf("Entidad %d no pudo ser asignada AWAYFROM_CONSTRAINT\n", i);
 					return false;
 				}
 				allocation[entity1] = room;
@@ -696,7 +708,7 @@ bool constructInitialSolution(int *allocation, struct Constraint *softConstraint
 				room = getRoom(entities, nRooms, entity1);
 				if (room == -1)
 				{
-					printf("Entidad %d no pudo ser asignada NOTSAMEROOM_CONSTRAINT\n", i);
+					// printf("Entidad %d no pudo ser asignada NOTSAMEROOM_CONSTRAINT\n", i);
 					return false;
 				}
 				allocation[entity1] = room;
@@ -743,7 +755,7 @@ bool constructInitialSolution(int *allocation, struct Constraint *softConstraint
 				room = getRoom(entities, nRooms, entity1);
 				if (room == -1)
 				{
-					printf("Entidad %d no pudo ser asignada NONALLOCATION_CONSTRAINT\n", i);
+					// printf("Entidad %d no pudo ser asignada NONALLOCATION_CONSTRAINT\n", i);
 					return false;
 				}
 				if (room != room2)
@@ -757,7 +769,6 @@ bool constructInitialSolution(int *allocation, struct Constraint *softConstraint
 			}
 		}
 	}
-
 	// Soft restrictions
 
 	// Satisfy soft restriction 6: NOTSHARING_CONSTRAINT
@@ -774,7 +785,7 @@ bool constructInitialSolution(int *allocation, struct Constraint *softConstraint
 				room = getRoom(entities, nRooms, entity1);
 				if (room == -1)
 				{
-					printf("Entidad %d no pudo ser asignada soft NOTSHARING_CONSTRAINT\n", i);
+					// printf("Entidad %d no pudo ser asignada soft NOTSHARING_CONSTRAINT\n", i);
 					return false;
 				}
 				allocation[entity1] = room;
@@ -824,7 +835,7 @@ bool constructInitialSolution(int *allocation, struct Constraint *softConstraint
 				room = getRoom(entities, nRooms, entity1);
 				if (room == -1)
 				{
-					printf("Entidad %d no pudo ser asignada soft SAMEROOM_CONSTRAINT\n", i);
+					// printf("Entidad %d no pudo ser asignada soft SAMEROOM_CONSTRAINT\n", i);
 					return false;
 				}
 				allocation[entity1] = room;
@@ -853,7 +864,7 @@ bool constructInitialSolution(int *allocation, struct Constraint *softConstraint
 				room = getRoom(entities, nRooms, entity1);
 				if (room == -1)
 				{
-					printf("Entidad %d no pudo ser asignada soft ADJACENCY_CONSTRAINT\n", i);
+					// printf("Entidad %d no pudo ser asignada soft ADJACENCY_CONSTRAINT\n", i);
 					return false;
 				}
 				allocation[entity1] = room;
@@ -889,7 +900,7 @@ bool constructInitialSolution(int *allocation, struct Constraint *softConstraint
 				room = getRoom(entities, nRooms, entity1);
 				if (room == -1)
 				{
-					printf("Entidad %d no pudo ser asignada soft NEARBY_CONSTRAINT\n", i);
+					// printf("Entidad %d no pudo ser asignada soft NEARBY_CONSTRAINT\n", i);
 					return false;
 				}
 				allocation[entity1] = room;
@@ -933,7 +944,7 @@ bool constructInitialSolution(int *allocation, struct Constraint *softConstraint
 				room = getRoom(entities, nRooms, i);
 				if (room == -1)
 				{
-					printf("Entidad %d no pudo ser asignada\n", i);
+					// printf("Entidad %d no pudo ser asignada\n", i);
 					return false;
 				}
 				allocation[i] = room;
@@ -950,7 +961,6 @@ bool constructInitialSolution(int *allocation, struct Constraint *softConstraint
 
 bool getInitialSolution(int *allocation, struct Constraint *softConstraints, struct Constraint *hardConstraints, struct Room *rooms, struct Entity *entities, int nSoftConstraints, int nHardConstraints, int nRooms, int nEntities, int maxIterations)
 {
-	printf("Get Initial Start\n");
 	int i, j;
 	for (i = 0; i < maxIterations; i++)
 	{
@@ -960,12 +970,12 @@ bool getInitialSolution(int *allocation, struct Constraint *softConstraints, str
 		}
 		if (constructInitialSolution(allocation, softConstraints, hardConstraints, rooms, entities, nSoftConstraints, nHardConstraints, nRooms, nEntities))
 		{
-			printf("Solución inicial creada correctamente\n");
+			printf("Solución inicial creada correctamente en iteración %d\n", i);
 			return true;
 		}
 		else
 		{
-			printf("Fallo en solución inicial\n");
+			// printf("Fallo en solución inicial\n");
 		}
 	}
 	return false;
@@ -1118,22 +1128,19 @@ int main(int argc, char **argv)
 	int *allocation = malloc(sizeof(int) * nEntities), quality;
 
 	int maxInitialIterations;
-	maxInitialIterations = 50;
+	maxInitialIterations = 1000;
 
 	if (!getInitialSolution(allocation, softConstraints, hardConstraints, rooms, entities, nSoftConstraints, nHardConstraints, nRooms, nEntities, maxInitialIterations))
 	{
-		printf("No se pudo obtener una solucion inicial\n");
+		printf("**ERROR** No se pudo obtener una solucion inicial en %d iteraiones\n", maxInitialIterations);
 	}
-
-	for (i = 0; i < nEntities; i++)
+	else
 	{
-		printf("%d ", allocation[i]);
+		quality = evaluationFunction(penalties, allocation, softConstraints, rooms, entities, nSoftConstraints, nRooms, nEntities);
+		printf("Calidad de la solución inicial: %d\n", quality);
 	}
-	printf("\n");
 
-	quality = evaluationFunction(penalties, allocation, softConstraints, rooms, entities, nSoftConstraints, nRooms, nEntities);
-
-	printf("Calidad de la solución inicial: %d\n", quality);
+	// showSolution(allocation, nEntities);
 
 	// Free memory
 
