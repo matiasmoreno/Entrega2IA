@@ -353,10 +353,6 @@ int evaluationFunction(int *penalties, int *allocation, struct Constraint *softC
 	return quality;
 }
 
-void checkNeighborhood(int *allocation, struct Entity *entities, int *availableEntities)
-{
-}
-
 void resetAvailableRooms(struct Entity *entities, int nEntities, int nRooms)
 {
 	for (int i = 0; i < nEntities; i++)
@@ -368,8 +364,46 @@ void resetAvailableRooms(struct Entity *entities, int nEntities, int nRooms)
 	}
 }
 
-void resetAvailableEntities(int *availableEntities)
+void resetAvailableEntities(int *availableEntities, int nEntities)
 {
+	for (int i = 0; i < nEntities; i++)
+	{
+		availableEntities[i] = i;
+	}
+}
+
+int getEntity(int *availableEntities, int nEntities)
+{
+	int i, j, entity, random, *entityPicker;
+	j = 0;
+	for (i = 0; i < nEntities; i++)
+	{
+		if (availableEntities[i] != -1)
+		{
+			j++;
+		}
+	}
+	entityPicker = malloc(sizeof(int) * j);
+	j = 0;
+	for (i = 0; i < nEntities; i++)
+	{
+		if (availableEntities[i] != -1)
+		{
+			entityPicker[j] = availableEntities[i];
+			j++;
+		}
+	}
+
+	if (j == 0)
+	{
+		return -1;
+	}
+
+	random = rand() % j;
+	entity = entityPicker[random];
+	availableEntities[entity] = -1;
+	free(entityPicker);
+	return entity;
 }
 
 int getRoom(struct Entity *entities, int nRooms, int index)
@@ -410,6 +444,7 @@ int getRoom(struct Entity *entities, int nRooms, int index)
 
 bool constructInitialSolution(int *allocation, struct Constraint *softConstraints, struct Constraint *hardConstraints, struct Room *rooms, struct Entity *entities, int nSoftConstraints, int nHardConstraints, int nRooms, int nEntities)
 {
+	resetAvailableRooms(entities, nEntities, nRooms);
 	resetHardConstraints(hardConstraints, nHardConstraints);
 
 	bool allocated = false;
@@ -970,7 +1005,7 @@ bool getInitialSolution(int *allocation, struct Constraint *softConstraints, str
 		}
 		if (constructInitialSolution(allocation, softConstraints, hardConstraints, rooms, entities, nSoftConstraints, nHardConstraints, nRooms, nEntities))
 		{
-			printf("Solución inicial creada correctamente en iteración %d\n", i);
+			// printf("Solución inicial creada correctamente en iteración %d\n", i);
 			return true;
 		}
 		else
@@ -979,6 +1014,79 @@ bool getInitialSolution(int *allocation, struct Constraint *softConstraints, str
 		}
 	}
 	return false;
+}
+int hillClimbing(int *availableEntities, int maxInitialIterations, int nRestart, int *penalties, int *bestSol, int *allocation, struct Constraint *softConstraints, struct Constraint *hardConstraints, struct Room *rooms, struct Entity *entities, int nSoftConstraints, int nHardConstraints, int nRooms, int nEntities)
+{
+	int r, entity, room, oldRoom;
+	int actualQuality, bestQuality, newQuality;
+	bool localMax, roomAvailable;
+	bestQuality = 32000;
+	for (r = 0; r < nRestart; r++)
+	{
+		printf("Iteración Numero: %d, best: %d \n", r, bestQuality);
+		actualQuality = 32000;
+		if (!getInitialSolution(allocation, softConstraints, hardConstraints, rooms, entities, nSoftConstraints, nHardConstraints, nRooms, nEntities, maxInitialIterations))
+		{
+			// printf("**ERROR** No se pudo obtener una solucion inicial en %d iteraciones\n", maxInitialIterations);
+		}
+		else
+		{
+			actualQuality = evaluationFunction(penalties, allocation, softConstraints, rooms, entities, nSoftConstraints, nRooms, nEntities);
+			// printf("Calidad de la solución inicial: %d\n", actualQuality);
+			if (actualQuality < bestQuality)
+			{
+				bestQuality = actualQuality;
+				bestSol = allocation;
+			}
+			resetAvailableEntities(availableEntities, nEntities);
+			resetAvailableRooms(entities, nEntities, nRooms);
+			localMax = false;
+			while (!localMax)
+			{
+				// Try to move an entity
+				entity = getEntity(availableEntities, nEntities);
+				oldRoom = allocation[entity];
+				if (entity == -1)
+				{
+					localMax = true;
+				}
+				else
+				{
+					roomAvailable = true;
+					while (roomAvailable)
+					{
+						room = getRoom(entities, nRooms, entity);
+						if (room == -1)
+						{
+							roomAvailable = false;
+							allocation[entity] = oldRoom;
+						}
+						else
+						{
+							allocation[entity] = room;
+							if (!violatesHard(allocation, hardConstraints, rooms, entities, nHardConstraints, nRooms, nEntities))
+							{
+								newQuality = evaluationFunction(penalties, allocation, softConstraints, rooms, entities, nSoftConstraints, nRooms, nEntities);
+								if (newQuality < actualQuality)
+								{
+									actualQuality = newQuality;
+									resetAvailableEntities(availableEntities, nEntities);
+									resetAvailableRooms(entities, nEntities, nRooms);
+								}
+								// Updates best solution
+								if (newQuality < bestQuality)
+								{
+									bestQuality = newQuality;
+									bestSol = allocation;
+								}
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+	return bestQuality;
 }
 
 // Main
@@ -1120,27 +1228,27 @@ int main(int argc, char **argv)
 	}
 
 	// Initial available rooms for every entity
-
 	initialEntityData(rooms, entities, nRooms, nEntities);
+
+	int *availableEntities = malloc(sizeof(int) * nEntities);
+
+	resetAvailableEntities(availableEntities, nEntities);
 
 	int *bestSol = malloc(sizeof(int) * nEntities), bestQuality;
 
-	int *allocation = malloc(sizeof(int) * nEntities), quality;
+	int *allocation = malloc(sizeof(int) * nEntities);
 
 	int maxInitialIterations;
 	maxInitialIterations = 1000;
 
-	if (!getInitialSolution(allocation, softConstraints, hardConstraints, rooms, entities, nSoftConstraints, nHardConstraints, nRooms, nEntities, maxInitialIterations))
-	{
-		printf("**ERROR** No se pudo obtener una solucion inicial en %d iteraiones\n", maxInitialIterations);
-	}
-	else
-	{
-		quality = evaluationFunction(penalties, allocation, softConstraints, rooms, entities, nSoftConstraints, nRooms, nEntities);
-		printf("Calidad de la solución inicial: %d\n", quality);
-	}
+	bestSol = allocation;
+	int nRestart;
+	nRestart = atoi(argv[2]);
 
-	// showSolution(allocation, nEntities);
+	bestQuality = hillClimbing(availableEntities, maxInitialIterations, nRestart, penalties, bestSol, allocation, softConstraints, hardConstraints, rooms, entities, nSoftConstraints, nHardConstraints, nRooms, nEntities);
+
+	printf("Mejor calidad encontrada: %d\n", bestQuality);
+	// showSolution(bestSol, nEntities);
 
 	// Free memory
 
@@ -1155,6 +1263,7 @@ int main(int argc, char **argv)
 	{
 		free(rooms[i].adjacentRooms);
 	}
+	free(availableEntities);
 	free(entities);
 	free(rooms);
 	free(hardConstraints);
